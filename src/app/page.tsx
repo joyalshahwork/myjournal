@@ -30,7 +30,7 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-parchment-muted hover:text-parchment font-body text-sm transition-colors">
-            Sign in
+            Signs in
           </Link>
           <Link href="/signup" className="btn-primary text-sm py-2 px-5">
             Get Started Free
