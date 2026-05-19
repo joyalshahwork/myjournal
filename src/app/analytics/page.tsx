@@ -79,7 +79,7 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-ink flex">
       <Sidebar streakCount={Number(streak?.current_streak ?? 0)} userName={String(profile?.name ?? '')} />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 md:ml-64 p-5 md:p-8 main-with-sidebar">
         <div className="mb-8 animate-fade-in">
           <h1 className="font-display text-4xl text-parchment font-semibold mb-1">Analytics</h1>
           <p className="text-parchment-dim font-body text-sm">Your money story at a glance.</p>

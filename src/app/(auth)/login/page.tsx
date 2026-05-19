@@ -33,17 +33,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink flex items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, #FFFFFF 0%, #F8F8F8 60%, #F2F2F2 100%)' }}>
       {/* Background glow */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-gold/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] bg-gold/4 rounded-full blur-[80px] pointer-events-none" />
 
       <div className="w-full max-w-md animate-slide-up">
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gold/20 border border-gold/30 flex items-center justify-center">
-              <span className="text-gold font-display font-bold text-lg">M</span>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+              <span className="text-white font-display font-bold text-lg">M</span>
             </div>
             <span className="font-display text-parchment text-2xl font-semibold">MyJournal</span>
           </Link>

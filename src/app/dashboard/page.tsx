@@ -38,7 +38,7 @@ export default async function DashboardPage() {
         userName={profile?.name ?? user.email?.split('@')[0] ?? 'Friend'}
       />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 md:ml-64 p-5 md:p-8 main-with-sidebar">
         {/* Header */}
         <div className="mb-10 animate-fade-in">
           <p className="text-parchment-dim font-body text-sm mb-1">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>

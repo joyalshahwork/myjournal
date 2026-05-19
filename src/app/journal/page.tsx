@@ -24,7 +24,7 @@ export default async function JournalPage() {
     <div className="min-h-screen bg-ink flex">
       <Sidebar streakCount={streak?.current_streak ?? 0} userName={profile?.name ?? ''} />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 md:ml-64 p-5 md:p-8 main-with-sidebar">
         {/* Header */}
         <div className="flex items-center justify-between mb-8 animate-fade-in">
           <div>
