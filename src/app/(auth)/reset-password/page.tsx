@@ -1,28 +1,59 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { Loader2, ArrowLeft, Mail } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-export default function ForgotPasswordPage() {
-  const [email, setEmail]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  const [submitted, setSubmitted] = useState(false)
+const RULES = [
+  { label: 'At least 8 characters', check: (p: string) => p.length >= 8 },
+  { label: 'One uppercase letter',   check: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One number',             check: (p: string) => /[0-9]/.test(p) },
+]
 
-  async function handleSubmit(e: React.FormEvent) {
+export default function ResetPasswordPage() {
+  const router = useRouter()
+  const [password, setPassword]   = useState('')
+  const [confirm, setConfirm]     = useState('')
+  const [showPw, setShowPw]       = useState(false)
+  const [showCf, setShowCf]       = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [ready, setReady]         = useState(false)
+
+  // Supabase puts the session tokens in the URL hash when the user
+  // clicks the email link. We need to let the client SDK pick them up.
+  useEffect(() => {
+    const supabase = createClient()
+    // onAuthStateChange fires once the hash tokens are consumed
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event) => {
+        if (event === 'PASSWORD_RECOVERY') setReady(true)
+      }
+    )
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleReset(e: React.FormEvent) {
     e.preventDefault()
+    if (!RULES.every(r => r.check(password))) {
+      toast.error('Please meet all password requirements')
+      return
+    }
+    if (password !== confirm) {
+      toast.error('Passwords do not match')
+      return
+    }
     setLoading(true)
     try {
       const supabase = createClient()
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
+      const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      setSubmitted(true)
+      toast.success('Password updated! Please sign in.')
+      router.push('/login')
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong'
+      const msg = err instanceof Error ? err.message : 'Update failed'
       toast.error(msg)
     } finally {
       setLoading(false)
@@ -35,9 +66,9 @@ export default function ForgotPasswordPage() {
       style={{ background: 'linear-gradient(160deg, #FFFFFF 0%, #F8F8F8 60%, #F2F2F2 100%)' }}
     >
       {/* Background glows */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none"
+      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none"
         style={{ background: 'rgba(201,168,76,0.07)' }} />
-      <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] rounded-full blur-[80px] pointer-events-none"
+      <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[80px] pointer-events-none"
         style={{ background: 'rgba(192,192,192,0.1)' }} />
 
       <div className="w-full max-w-md animate-slide-up">
@@ -52,76 +83,98 @@ export default function ForgotPasswordPage() {
             </div>
             <span className="font-display text-dark text-2xl font-semibold">MyJournal</span>
           </Link>
-          <h1 className="font-display text-3xl text-dark font-semibold mb-2">Forgot password?</h1>
+          <h1 className="font-display text-3xl text-dark font-semibold mb-2">Set new password</h1>
           <p className="text-parchment-dim font-body text-sm">
-            No worries — we&apos;ll send you a reset link.
+            Choose something strong that you&apos;ll remember.
           </p>
         </div>
 
         <div className="card p-8" style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          {submitted ? (
-            /* ── Success state ── */
-            <div className="text-center py-4 animate-fade-in">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
-                style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.25)' }}
-              >
-                <Mail size={24} className="text-gold" />
-              </div>
-              <h2 className="font-display text-xl text-dark font-semibold mb-2">Check your email</h2>
-              <p className="text-parchment-dim font-body text-sm leading-relaxed mb-6">
-                We sent a reset link to <span className="text-dark font-medium">{email}</span>.
-                It expires in 1 hour.
-              </p>
-              <p className="text-parchment-dim text-xs font-body mb-6">
-                Didn&apos;t receive it? Check your spam folder or{' '}
-                <button
-                  onClick={() => setSubmitted(false)}
-                  className="text-gold hover:text-gold-light transition-colors font-medium underline underline-offset-2"
-                >
-                  try again
-                </button>
-                .
-              </p>
-              <Link href="/login" className="btn-ghost text-sm flex items-center justify-center gap-2">
-                <ArrowLeft size={15} /> Back to Sign In
-              </Link>
+          {!ready ? (
+            /* ── Waiting for Supabase session ── */
+            <div className="text-center py-8 animate-fade-in">
+              <Loader2 size={28} className="animate-spin text-gold mx-auto mb-4" />
+              <p className="text-parchment-dim font-body text-sm">Verifying your reset link…</p>
             </div>
           ) : (
             /* ── Form ── */
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleReset} className="space-y-5">
+              {/* New password */}
               <div>
                 <label className="block text-parchment-muted text-sm font-body mb-2">
-                  Email address
+                  New Password
                 </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  required
-                  className="input-base glow-gold"
-                />
+                <div className="relative">
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="input-base glow-gold pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(!showPw)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-parchment-dim hover:text-dark transition-colors"
+                  >
+                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {/* Password rules */}
+                {password && (
+                  <ul className="mt-3 space-y-1">
+                    {RULES.map(r => (
+                      <li key={r.label} className="flex items-center gap-2 text-xs font-body">
+                        <Check
+                          size={12}
+                          className={r.check(password) ? 'text-gold' : 'text-parchment-dim'}
+                        />
+                        <span className={r.check(password) ? 'text-parchment-muted' : 'text-parchment-dim'}>
+                          {r.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Confirm password */}
+              <div>
+                <label className="block text-parchment-muted text-sm font-body mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCf ? 'text' : 'password'}
+                    value={confirm}
+                    onChange={e => setConfirm(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="input-base glow-gold pr-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCf(!showCf)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-parchment-dim hover:text-dark transition-colors"
+                  >
+                    {showCf ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {confirm && password !== confirm && (
+                  <p className="mt-2 text-xs font-body text-journal-red">Passwords do not match</p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || password !== confirm}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {loading
-                  ? <><Loader2 size={16} className="animate-spin" /> Sending…</>
-                  : 'Send Reset Link →'}
+                  ? <><Loader2 size={16} className="animate-spin" /> Updating…</>
+                  : 'Update Password →'}
               </button>
-
-              <div className="divider" />
-
-              <Link
-                href="/login"
-                className="flex items-center justify-center gap-2 text-parchment-dim hover:text-dark text-sm font-body transition-colors"
-              >
-                <ArrowLeft size={15} /> Back to Sign In
-              </Link>
             </form>
           )}
         </div>
