@@ -23,39 +23,58 @@ export default function ResetPasswordPage() {
   const [status, setStatus]     = useState<'verifying' | 'ready' | 'invalid'>('verifying')
 
   useEffect(() => {
-    // Supabase puts tokens in the URL hash:
-    // /reset-password#access_token=xxx&refresh_token=yyy&type=recovery
-    // We manually parse the hash, set the session, then show the form.
-    async function consumeHashTokens() {
-      const hash = window.location.hash.substring(1) // strip leading #
-      const params = new URLSearchParams(hash)
+    async function consumeTokens() {
+      const supabase = createClient()
 
-      const accessToken  = params.get('access_token')
-      const refreshToken = params.get('refresh_token')
-      const type         = params.get('type')
+      // ── PKCE flow (default in @supabase/ssr) ──
+      // Supabase sends a one-time `?code=xxx` search param after clicking the email link.
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
 
-      if (!accessToken || !refreshToken || type !== 'recovery') {
-        // No valid tokens — link is broken or already used
-        setStatus('invalid')
-        return
+      if (code) {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          if (error) throw error
+          // Clean the code from the URL so it can't be replayed
+          window.history.replaceState(null, '', window.location.pathname)
+          setStatus('ready')
+          return
+        } catch {
+          setStatus('invalid')
+          return
+        }
       }
 
-      try {
-        const supabase = createClient()
-        const { error } = await supabase.auth.setSession({
-          access_token:  accessToken,
-          refresh_token: refreshToken,
-        })
-        if (error) throw error
-        // Clear the hash from the URL so tokens aren't visible
-        window.history.replaceState(null, '', window.location.pathname)
-        setStatus('ready')
-      } catch {
+      // ── Fallback: legacy implicit / hash-fragment flow ──
+      // Older Supabase setups put tokens in the URL hash:
+      // /reset-password#access_token=xxx&refresh_token=yyy&type=recovery
+      const hash = window.location.hash.substring(1) // strip leading #
+      const hashParams = new URLSearchParams(hash)
+
+      const accessToken  = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const type         = hashParams.get('type')
+
+      if (accessToken && refreshToken && type === 'recovery') {
+        try {
+          const { error } = await supabase.auth.setSession({
+            access_token:  accessToken,
+            refresh_token: refreshToken,
+          })
+          if (error) throw error
+          // Clear the hash so tokens aren't visible in the address bar
+          window.history.replaceState(null, '', window.location.pathname)
+          setStatus('ready')
+        } catch {
+          setStatus('invalid')
+        }
+      } else {
+        // No valid tokens found via either method
         setStatus('invalid')
       }
     }
 
-    consumeHashTokens()
+    consumeTokens()
   }, [])
 
   async function handleReset(e: React.FormEvent) {
@@ -90,10 +109,14 @@ export default function ResetPasswordPage() {
       style={{ background: 'linear-gradient(160deg, #FFFFFF 0%, #F8F8F8 60%, #F2F2F2 100%)' }}
     >
       {/* Background glows */}
-      <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none"
-        style={{ background: 'rgba(201,168,76,0.07)' }} />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[80px] pointer-events-none"
-        style={{ background: 'rgba(192,192,192,0.1)' }} />
+      <div
+        className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none"
+        style={{ background: 'rgba(201,168,76,0.07)' }}
+      />
+      <div
+        className="absolute bottom-[-20%] right-[-10%] w-[400px] h-[400px] rounded-full blur-[80px] pointer-events-none"
+        style={{ background: 'rgba(192,192,192,0.1)' }}
+      />
 
       <div className="w-full max-w-md animate-slide-up">
         {/* Logo */}
@@ -101,7 +124,10 @@ export default function ResetPasswordPage() {
           <Link href="/" className="inline-flex items-center gap-3 mb-6">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #E2C46E, #C9A84C)', boxShadow: '0 2px 8px rgba(201,168,76,0.3)' }}
+              style={{
+                background: 'linear-gradient(135deg, #E2C46E, #C9A84C)',
+                boxShadow: '0 2px 8px rgba(201,168,76,0.3)',
+              }}
             >
               <span className="text-white font-display font-bold text-lg">M</span>
             </div>
@@ -128,11 +154,16 @@ export default function ResetPasswordPage() {
             <div className="text-center py-6 animate-fade-in">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
-                style={{ background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.2)' }}
+                style={{
+                  background: 'rgba(192,57,43,0.08)',
+                  border: '1px solid rgba(192,57,43,0.2)',
+                }}
               >
                 <AlertCircle size={24} className="text-journal-red" />
               </div>
-              <h2 className="font-display text-xl text-dark font-semibold mb-2">Link expired or invalid</h2>
+              <h2 className="font-display text-xl text-dark font-semibold mb-2">
+                Link expired or invalid
+              </h2>
               <p className="text-parchment-dim font-body text-sm leading-relaxed mb-6">
                 This reset link has already been used or has expired. Reset links are valid for 1 hour.
               </p>
@@ -145,6 +176,7 @@ export default function ResetPasswordPage() {
           {/* ── Ready: show form ── */}
           {status === 'ready' && (
             <form onSubmit={handleReset} className="space-y-5 animate-fade-in">
+
               {/* New password */}
               <div>
                 <label className="block text-parchment-muted text-sm font-body mb-2">
@@ -167,13 +199,19 @@ export default function ResetPasswordPage() {
                     {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+
                 {/* Password rules */}
                 {password && (
                   <ul className="mt-3 space-y-1">
                     {RULES.map(r => (
                       <li key={r.label} className="flex items-center gap-2 text-xs font-body">
-                        <Check size={12} className={r.check(password) ? 'text-gold' : 'text-parchment-dim'} />
-                        <span className={r.check(password) ? 'text-parchment-muted' : 'text-parchment-dim'}>
+                        <Check
+                          size={12}
+                          className={r.check(password) ? 'text-gold' : 'text-parchment-dim'}
+                        />
+                        <span
+                          className={r.check(password) ? 'text-parchment-muted' : 'text-parchment-dim'}
+                        >
                           {r.label}
                         </span>
                       </li>
@@ -211,12 +249,20 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading || password !== confirm || !RULES.every(r => r.check(password))}
+                disabled={
+                  loading ||
+                  password !== confirm ||
+                  !RULES.every(r => r.check(password))
+                }
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
-                {loading
-                  ? <><Loader2 size={16} className="animate-spin" /> Updating…</>
-                  : 'Update Password →'}
+                {loading ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Updating…
+                  </>
+                ) : (
+                  'Update Password →'
+                )}
               </button>
             </form>
           )}
