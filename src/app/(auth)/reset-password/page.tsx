@@ -24,6 +24,10 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     async function consumeTokens() {
+      console.log('FULL URL:', window.location.href)
+      console.log('SEARCH:', window.location.search)
+      console.log('HASH:', window.location.hash)
+
       const supabase = createClient()
 
       // ── PKCE flow (default in @supabase/ssr) ──
@@ -39,7 +43,8 @@ export default function ResetPasswordPage() {
           window.history.replaceState(null, '', window.location.pathname)
           setStatus('ready')
           return
-        } catch {
+        } catch (error) {
+          console.error('PKCE ERROR:', error)
           setStatus('invalid')
           return
         }
@@ -65,7 +70,8 @@ export default function ResetPasswordPage() {
           // Clear the hash so tokens aren't visible in the address bar
           window.history.replaceState(null, '', window.location.pathname)
           setStatus('ready')
-        } catch {
+        } catch (error) {
+          console.error('HASH FLOW ERROR:', error)
           setStatus('invalid')
         }
       } else {
