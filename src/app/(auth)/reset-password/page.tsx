@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import { Eye, EyeOff, Loader2, Check } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Check, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const RULES = [
@@ -15,23 +15,47 @@ const RULES = [
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const [password, setPassword]   = useState('')
-  const [confirm, setConfirm]     = useState('')
-  const [showPw, setShowPw]       = useState(false)
-  const [showCf, setShowCf]       = useState(false)
-  const [loading, setLoading]     = useState(false)
-  const [ready, setReady]         = useState(false)
-
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm]   = useState('')
+  const [showPw, setShowPw]     = useState(false)
+  const [showCf, setShowCf]     = useState(false)
+  const [loading, setLoading]   = useState(false)
+  const [status, setStatus]     = useState<'verifying' | 'ready' | 'invalid'>('verifying')
 
   useEffect(() => {
-    const supabase = createClient()
-    // onAuthStateChange fires once the hash tokens are consumed
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event) => {
-        if (event === 'PASSWORD_RECOVERY') setReady(true)
+    // Supabase puts tokens in the URL hash:
+    // /reset-password#access_token=xxx&refresh_token=yyy&type=recovery
+    // We manually parse the hash, set the session, then show the form.
+    async function consumeHashTokens() {
+      const hash = window.location.hash.substring(1) // strip leading #
+      const params = new URLSearchParams(hash)
+
+      const accessToken  = params.get('access_token')
+      const refreshToken = params.get('refresh_token')
+      const type         = params.get('type')
+
+      if (!accessToken || !refreshToken || type !== 'recovery') {
+        // No valid tokens — link is broken or already used
+        setStatus('invalid')
+        return
       }
-    )
-    return () => subscription.unsubscribe()
+
+      try {
+        const supabase = createClient()
+        const { error } = await supabase.auth.setSession({
+          access_token:  accessToken,
+          refresh_token: refreshToken,
+        })
+        if (error) throw error
+        // Clear the hash from the URL so tokens aren't visible
+        window.history.replaceState(null, '', window.location.pathname)
+        setStatus('ready')
+      } catch {
+        setStatus('invalid')
+      }
+    }
+
+    consumeHashTokens()
   }, [])
 
   async function handleReset(e: React.FormEvent) {
@@ -49,6 +73,7 @@ export default function ResetPasswordPage() {
       const supabase = createClient()
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
+      await supabase.auth.signOut()
       toast.success('Password updated! Please sign in.')
       router.push('/login')
     } catch (err: unknown) {
@@ -89,15 +114,37 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="card p-8" style={{ borderColor: 'rgba(201,168,76,0.18)' }}>
-          {!ready ? (
-            /* ── Waiting for Supabase session ── */
+
+          {/* ── Verifying ── */}
+          {status === 'verifying' && (
             <div className="text-center py-8 animate-fade-in">
               <Loader2 size={28} className="animate-spin text-gold mx-auto mb-4" />
               <p className="text-parchment-dim font-body text-sm">Verifying your reset link…</p>
             </div>
-          ) : (
-            /* ── Form ── */
-            <form onSubmit={handleReset} className="space-y-5">
+          )}
+
+          {/* ── Invalid / expired link ── */}
+          {status === 'invalid' && (
+            <div className="text-center py-6 animate-fade-in">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-5"
+                style={{ background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.2)' }}
+              >
+                <AlertCircle size={24} className="text-journal-red" />
+              </div>
+              <h2 className="font-display text-xl text-dark font-semibold mb-2">Link expired or invalid</h2>
+              <p className="text-parchment-dim font-body text-sm leading-relaxed mb-6">
+                This reset link has already been used or has expired. Reset links are valid for 1 hour.
+              </p>
+              <Link href="/forgot-password" className="btn-primary text-sm inline-block">
+                Request a new link →
+              </Link>
+            </div>
+          )}
+
+          {/* ── Ready: show form ── */}
+          {status === 'ready' && (
+            <form onSubmit={handleReset} className="space-y-5 animate-fade-in">
               {/* New password */}
               <div>
                 <label className="block text-parchment-muted text-sm font-body mb-2">
@@ -125,10 +172,7 @@ export default function ResetPasswordPage() {
                   <ul className="mt-3 space-y-1">
                     {RULES.map(r => (
                       <li key={r.label} className="flex items-center gap-2 text-xs font-body">
-                        <Check
-                          size={12}
-                          className={r.check(password) ? 'text-gold' : 'text-parchment-dim'}
-                        />
+                        <Check size={12} className={r.check(password) ? 'text-gold' : 'text-parchment-dim'} />
                         <span className={r.check(password) ? 'text-parchment-muted' : 'text-parchment-dim'}>
                           {r.label}
                         </span>
@@ -167,7 +211,7 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                disabled={loading || password !== confirm}
+                disabled={loading || password !== confirm || !RULES.every(r => r.check(password))}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 {loading
@@ -176,6 +220,7 @@ export default function ResetPasswordPage() {
               </button>
             </form>
           )}
+
         </div>
       </div>
     </div>
