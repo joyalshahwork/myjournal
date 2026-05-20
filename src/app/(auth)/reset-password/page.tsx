@@ -22,67 +22,44 @@ export default function ResetPasswordPage() {
   const [loading, setLoading]   = useState(false)
   const [status, setStatus]     = useState<'verifying' | 'ready' | 'invalid'>('verifying')
 
-  useEffect(() => {
-    async function consumeTokens() {
-      console.log('FULL URL:', window.location.href)
-      console.log('SEARCH:', window.location.search)
-      console.log('HASH:', window.location.hash)
+useEffect(() => {
+  async function consumeTokens() {
+    console.log('FULL URL:', window.location.href)
+    console.log('SEARCH:', window.location.search)
+    console.log('HASH:', window.location.hash)
 
-      const supabase = createClient()
+    const supabase = createClient()
 
-      // ── PKCE flow (default in @supabase/ssr) ──
-      // Supabase sends a one-time `?code=xxx` search param after clicking the email link.
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
+    const hash = window.location.hash.substring(1)
+    const hashParams = new URLSearchParams(hash)
 
-      if (code) {
-        try {
-          const { error } = await supabase.auth.exchangeCodeForSession(code)
-          if (error) throw error
-          // Clean the code from the URL so it can't be replayed
-          window.history.replaceState(null, '', window.location.pathname)
-          setStatus('ready')
-          return
-        } catch (error) {
-          console.error('PKCE ERROR:', error)
-          setStatus('invalid')
-          return
-        }
-      }
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
 
-      // ── Fallback: legacy implicit / hash-fragment flow ──
-      // Older Supabase setups put tokens in the URL hash:
-      // /reset-password#access_token=xxx&refresh_token=yyy&type=recovery
-      const hash = window.location.hash.substring(1) // strip leading #
-      const hashParams = new URLSearchParams(hash)
-
-      const accessToken  = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
-      const type         = hashParams.get('type')
-
-      if (accessToken && refreshToken && type === 'recovery') {
-        try {
-          const { error } = await supabase.auth.setSession({
-            access_token:  accessToken,
-            refresh_token: refreshToken,
-          })
-          if (error) throw error
-          // Clear the hash so tokens aren't visible in the address bar
-          window.history.replaceState(null, '', window.location.pathname)
-          setStatus('ready')
-        } catch (error) {
-          console.error('HASH FLOW ERROR:', error)
-          setStatus('invalid')
-        }
-      } else {
-        // No valid tokens found via either method
-        setStatus('invalid')
-      }
+    if (!accessToken || !refreshToken) {
+      setStatus('invalid')
+      return
     }
 
-    consumeTokens()
-  }, [])
+    try {
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
 
+      if (error) throw error
+
+      window.history.replaceState(null, '', window.location.pathname)
+
+      setStatus('ready')
+    } catch (error) {
+      console.error('SESSION ERROR:', error)
+      setStatus('invalid')
+    }
+  }
+
+  consumeTokens()
+}, [])
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
     if (!RULES.every(r => r.check(password))) {
