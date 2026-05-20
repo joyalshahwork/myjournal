@@ -22,8 +22,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading]     = useState(false)
   const [ready, setReady]         = useState(false)
 
-  // Supabase puts the session tokens in the URL hash when the user
-  // clicks the email link. We need to let the client SDK pick them up.
+
   useEffect(() => {
     const supabase = createClient()
     // onAuthStateChange fires once the hash tokens are consumed
