@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+// @ts-ignore
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import AIChatbot from '@/components/features/chat/AIChatbot'
 
 export const metadata: Metadata = {
   title: 'MyJournal — Write. Reflect. Grow.',
@@ -23,8 +25,9 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <AIChatbot />
         <Toaster
-          position="bottom-right"
+          position="bottom-left"
           toastOptions={{
             style: {
               background: '#1E1C1A',

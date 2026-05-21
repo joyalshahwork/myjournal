@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
   LayoutDashboard, BookOpen, Receipt, BarChart2,
-  LogOut, Flame, Settings,
+  LogOut, Flame, Settings, Sparkles,
 } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import toast from 'react-hot-toast'
@@ -20,6 +20,10 @@ const NAV = [
 interface SidebarProps {
   streakCount?: number
   userName?: string
+}
+
+function openChat() {
+  window.dispatchEvent(new Event('mmjj:open-chat'))
 }
 
 export default function Sidebar({ streakCount = 0, userName = 'Friend' }: SidebarProps) {
@@ -95,6 +99,21 @@ export default function Sidebar({ streakCount = 0, userName = 'Friend' }: Sideba
           })}
         </nav>
 
+        {/* AI Chat button */}
+        <div className="px-3 pb-2">
+          <button
+            onClick={openChat}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-body text-sm transition-all duration-200 text-white"
+            style={{
+              background: 'linear-gradient(135deg, #E2C46E, #C9A84C)',
+              boxShadow: '0 2px 12px rgba(201,168,76,0.3)',
+            }}
+          >
+            <Sparkles size={18} />
+            AI Wellness Coach
+          </button>
+        </div>
+
         {/* Bottom section */}
         <div className="px-3 pb-6 space-y-1">
           <div className="divider" />
@@ -147,6 +166,15 @@ export default function Sidebar({ streakCount = 0, userName = 'Friend' }: Sideba
               </Link>
             )
           })}
+          {/* AI Chat on mobile */}
+          <button
+            onClick={openChat}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-200"
+            style={{ color: '#C9A84C' }}
+          >
+            <Sparkles size={20} />
+            <span className="text-xs font-body font-medium">AI</span>
+          </button>
           {/* Logout on mobile */}
           <button
             onClick={handleLogout}
